@@ -106,6 +106,40 @@ export default function PokemonReportsPage() {
 
   const isLoading = loadingTypes || loadingReports
 
+  // De la tarea 3: Reportes con Muestreo Aleatorio
+  const [sampleSize, setSampleSize] = useState("");
+
+  const handledSampleSizeChange = (e) => {
+    const value = e.target.value
+    //Tarea 3: Valida que sea un entero positivo
+    if (/^\d*$/.test(value)) {
+      setSampleSize(value)
+    }
+  }
+
+  const handleCreateReport = async () => {
+    if (!selectedType) {
+      toast.error("Por favor selecciona un tipo de Pokémon")
+      return
+    }
+
+    if (sampleSize !== "" && (!/^\d+$/.test(sampleSize) || Number(sampleSize) <= 0)) {
+      toast.error("Por favor ingresa un número entero positivo para el número máximo de registros")
+      return
+    }
+
+    try {
+      setCreatingReport(true)
+      await createReport(selectedType, sampleSize ? Number(sampleSize) : undefined)
+      toast.success("Reporte creado correctamente")
+      await loadReports() 
+    } catch (error) {
+      toast.error("Error creando el reporte")
+    } finally {
+      setCreatingReport(false)
+    }
+  }
+
   return (
     <div className="container mx-auto py-8 px-4">
       <Card>
@@ -120,15 +154,25 @@ export default function PokemonReportsPage() {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-
           <div className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="w-full md:w-2/3">
+            <div className="w-full md:w-1/3">
               <PokemonTypeSelector
                 pokemonTypes={pokemonTypes}
                 selectedType={selectedType}
                 onTypeChange={setSelectedType}
                 loading={loadingTypes}
               />
+            </div>
+            {/*Tarea 3: Añade un campo de entrada numérica en el formulario */}
+            <div className="w-full flex items-center gap-1 md:w-2/3">
+              <label htmlFor="sampleSize" className="block font-semibold">
+                Numero Maximo de Registros
+              </label>
+              <input type="number" id="sampleSize" name="sampleSize" min={1} value={sampleSize} onChange={handledSampleSizeChange} placeholder="Ej. 10" className="border rounded px-2 py-1 w-32"
+              />
+              <Button onClick={handleCreateReport} className="whitespace-nowrap" disabled={!selectedType || isLoading || creatingReport}>
+                Crear Reporte
+              </Button>
             </div>
             <div className="w-full md:w-1/3">
               <Button
@@ -146,6 +190,7 @@ export default function PokemonReportsPage() {
             loading={loadingReports}
             onRefresh={handleRefreshTable}
             onDownload={handleDownloadCSV}
+            onCreateReport={(sampleSize) => createReport(selectedType, sampleSize)} //Tarea 3
           />
         </CardContent>
       </Card>

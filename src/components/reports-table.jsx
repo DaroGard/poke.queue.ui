@@ -7,10 +7,19 @@ import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
 
-export default function ReportsTable({ reports, loading, onRefresh, onDownload }) {
+//De la tarea 1: imports
+import { Trash2 } from "lucide-react"; //Icono de basurero
+import { ConfirmDialog } from "@/components/ConfirmDialog" //Ventana modal
+import settings from "@/lib/settings"; //URL
+
+export default function ReportsTable({ reports, loading, onRefresh, onDownload, onCreateReport }) {
   const [refreshing, setRefreshing] = useState(false)
   const [sortedReports, setSortedReports] = useState([])
   const [sortDirection, setSortDirection] = useState("desc") // "desc" para descendente (más reciente primero)
+
+  // De la tarea 1: Estado para el modal
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false)
+  const [reportToDelete, setReportToDelete] = useState(null)
 
   // Ordenar los reportes cuando cambian o cuando cambia la dirección de ordenamiento
   useEffect(() => {
@@ -103,6 +112,53 @@ export default function ReportsTable({ reports, loading, onRefresh, onDownload }
     }
   }
 
+  // De la tarea 1: Implementa una confirmación (ej. un diálogo modal) antes de proceder con la eliminación.
+  const handleDelete = (report) => {
+    setReportToDelete(report)
+    setIsConfirmOpen(true)
+  }
+
+  // De la tarea 1: Al confirmar, realiza una llamada a la API backend para solicitar la eliminación.
+const handleConfirmDelete = async () => {
+  if (!reportToDelete) return;
+  const reportId = getPropertyValue(reportToDelete, "reportId") || getPropertyValue(reportToDelete, "ReportId");
+
+  try {
+    const response = await fetch(`${settings.URL}/api/report/${reportId}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      const contentType = response.headers.get("content-type") || "";
+      let errMsg = "Error al eliminar el reporte";
+
+      if (contentType.includes("application/json")) {
+        const errJson = await response.json();
+        errMsg = errJson.detail || errMsg;
+      } else {
+        const text = await response.text();
+        errMsg = text;
+      }
+
+      throw new Error(errMsg);
+    }
+
+    toast.success("Reporte eliminado correctamente");
+    //  // De la tarea 1: Actualiza la lista de reportes en la UI después de una eliminación exitosa.
+    await onRefresh();
+  } catch (error) {
+    toast.error(`Error eliminando reporte: ${error.message}`);
+  } finally {
+    setIsConfirmOpen(false);
+    setReportToDelete(null);
+  }
+};
+
+  const handleCancelDelete = () => {
+    setIsConfirmOpen(false)
+    setReportToDelete(null)
+  }
+
   return (
     <div className="overflow-x-auto">
       <div className="flex justify-between items-center mb-2">
@@ -163,9 +219,8 @@ export default function ReportsTable({ reports, loading, onRefresh, onDownload }
                   <TableCell>{getPropertyValue(report, "reportId")}</TableCell>
                   <TableCell>
                     <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        isStatusCompleted(report) ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
-                      }`}
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${isStatusCompleted(report) ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
+                        }`}
                     >
                       {getPropertyValue(report, "status")}
                     </span>
@@ -177,9 +232,12 @@ export default function ReportsTable({ reports, loading, onRefresh, onDownload }
                   <TableCell>{getPropertyValue(report, "updated")}</TableCell>
                   <TableCell>
                     {isStatusCompleted(report) && (
-                      <Button variant="ghost" size="icon" onClick={() => handleDownload(report)} title="Download CSV">
+                      <><Button variant="ghost" size="icon" onClick={() => handleDownload(report)} title="Download CSV">
                         <Download className="h-4 w-4" />
                       </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(report)} title="Delete Report">
+                          <Trash2 className="h-4 w-4 text-red-600 hover:text-red-800" />
+                        </Button></>
                     )}
                   </TableCell>
                 </TableRow>
@@ -194,6 +252,13 @@ export default function ReportsTable({ reports, loading, onRefresh, onDownload }
           </TableBody>
         </Table>
       )}
+      <ConfirmDialog
+        isOpen={isConfirmOpen}
+        title="Eliminar Reporte"
+        description="¿Estás seguro que deseas eliminar este reporte? Esta acción no se puede deshacer."
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+      />
     </div>
   )
 }
